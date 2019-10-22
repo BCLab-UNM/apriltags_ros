@@ -6,6 +6,8 @@
 #include <geometry_msgs/PoseArray.h>
 #include <apriltags_ros/AprilTagDetection.h>
 #include <apriltags_ros/AprilTagDetectionArray.h>
+#include <apriltags_ros/AprilTagBasicDetection.h>
+#include <apriltags_ros/AprilTagBasicDetectionArray.h>
 #include <AprilTags/Tag16h5.h>
 #include <AprilTags/Tag25h7.h>
 #include <AprilTags/Tag25h9.h>
@@ -62,6 +64,7 @@ AprilTagDetector::AprilTagDetector(ros::NodeHandle& nh, ros::NodeHandle& pnh): i
   image_sub_ = it_.subscribeCamera("image_rect", 1, &AprilTagDetector::imageCb, this);
   image_pub_ = it_.advertise("tag_detections_image", 1);
   detections_pub_ = nh.advertise<AprilTagDetectionArray>("tag_detections", 1);
+  basic_detections_pub_ = nh.advertise<AprilTagBasicDetectionArray>("basic_tag_detections", 1);
   pose_pub_ = nh.advertise<geometry_msgs::PoseArray>("tag_detections_pose", 1);
 }
 AprilTagDetector::~AprilTagDetector(){
@@ -106,6 +109,7 @@ void AprilTagDetector::imageCb(const sensor_msgs::ImageConstPtr& msg, const sens
     cv_ptr->header.frame_id = sensor_frame_id_;
 
   AprilTagDetectionArray tag_detection_array;
+  AprilTagBasicDetectionArray basic_detection_array;
   geometry_msgs::PoseArray tag_pose_array;
   tag_pose_array.header = cv_ptr->header;
 
@@ -140,11 +144,18 @@ void AprilTagDetector::imageCb(const sensor_msgs::ImageConstPtr& msg, const sens
     tag_detection_array.detections.push_back(tag_detection);
     tag_pose_array.poses.push_back(tag_pose.pose);
 
+    AprilTagBasicDetection basic_detection;
+    basic_detection.id = detection.id;
+    basic_detection.x  = detection.cxy.first;
+    basic_detection.y  = detection.cxy.second;
+    basic_detection_array.detections.push_back(basic_detection);
+
     tf::Stamped<tf::Transform> tag_transform;
     tf::poseStampedMsgToTF(tag_pose, tag_transform);
     tf_pub_.sendTransform(tf::StampedTransform(tag_transform, tag_transform.stamp_, tag_transform.frame_id_, description.frame_name()));
   }
   detections_pub_.publish(tag_detection_array);
+  basic_detections_pub_.publish(basic_detection_array);
   pose_pub_.publish(tag_pose_array);
   image_pub_.publish(cv_ptr->toImageMsg());
 }
